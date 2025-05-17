@@ -39,7 +39,32 @@ SELECT
 FROM revenue_adjusted_22
 GROUP BY 1,2;
 
--- Categories Montly Adjusted Revenue for the top 4 products in 2022
+-- Location Monthly Adjusted Revenue
+SELECT 
+	  DATE_FORMAT(date,'%Y-%m') AS date,
+      location,
+      ROUND(SUM(adj_revenue),2) AS adj_revenue
+FROM revenue_adjusted_22
+GROUP BY 1,2;
+
+-- Platform Montly Adjust Revenue
+SELECT 
+      DATE_FORMAT(date,'%Y-%m') AS date,
+      platform,
+      ROUND(SUM(adj_revenue)) AS adj_revenue
+FROM revenue_adjusted_22
+GROUP BY 1,2;
+
+-- Platform and Location Montly Adjust Revenue
+SELECT 
+      DATE_FORMAT(date,'%Y-%m') AS date,
+      location,
+      platform,
+      ROUND(SUM(adj_revenue),2) AS adj_revenue
+FROM revenue_adjusted_22
+GROUP BY 1,2,3;
+
+-- Categories Montly Adjusted Revenue for the top 4 products 
 SELECT 
       date,
       product_category,
@@ -55,6 +80,16 @@ FROM(
 	WHERE category IN ('Vitamin','Mineral','Performance','Protein')
     ) AS tab
 GROUP BY  date,product_name,product_category;
+
+-- Compare products categories in Canada across diffrent platforms 
+SELECT 
+      DATE_FORMAT(date,'%Y-%m') AS date,
+      category,
+      platform,
+      ROUND(SUM(adj_revenue),2)AS adj_revenue
+FROM revenue_adjusted_22
+WHERE location = 'Canada'
+GROUP BY 1,2,3;
 
 -- Calculate the gap montly difference between Vitamins and Performance 
 SELECT 
@@ -76,6 +111,102 @@ FROM (
 	GROUP BY 1
     ) AS tab;
     
+-- Calculate the gap montly difference between Vitamins and Proteins
+SELECT 
+	 date,
+     ROUND(vitamin_revenue - protein_revenue,2) AS vitamin_minus_protein,
+     ROUND(vitamin_revenue / protein_revenue,2) AS vitamin_times_protein,
+     ROUND((vitamin_revenue / protein_revenue - 1)* 100,2) AS vitamin_pct_protein
+FROM(
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  SUM(CASE 
+				 WHEN category = "Vitamin" THEN adj_revenue
+				 END) AS vitamin_revenue,
+		  SUM(CASE 
+				  WHEN category = "Protein" THEN adj_revenue
+				  END) AS protein_revenue
+	FROM revenue_adjusted_22
+	GROUP BY 1
+    ) AS tab;
+
+-- Calculate the gap montly difference between Vitamins and Minerals
+SELECT 
+     date,
+     ROUND(vitamin_revenue - minerals_revenue,2) AS vitamins_minus_minerals,
+     ROUND(vitamin_revenue / minerals_revenue,2) AS vitamins_times_mineeals,
+     ROUND((vitamin_revenue / minerals_revenue-1)*100,2) AS vitamin_pct_minerals
+FROM(
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m")AS date,
+		  SUM(CASE
+				  WHEN category = "Vitamin" THEN adj_revenue
+				  END) AS vitamin_revenue,
+		  SUM(CASE
+				  WHEN category = "Mineral" THEN adj_revenue
+				  END) AS minerals_revenue
+	FROM revenue_adjusted_22
+	GROUP BY 1
+) AS tab;
+
+-- Calculate the gap montly difference between Vitamins Vitamin C and Biotin
+SELECT 
+	  date,
+      ROUND(vitamin_c_revenue - biotin_revenue,2) AS vitamin_c_minus_biotin,
+      ROUND(vitamin_c_revenue / biotin_revenue,2) AS vitamin_c_times_biotin,
+      ROUND((vitamin_c_revenue / biotin_revenue - 1) * 100,2) AS vitamin_c_pct_biotin
+FROM(
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  SUM(CASE 
+				  WHEN product_name = "Vitamin C" THEN adj_revenue
+					   END) AS vitamin_c_revenue,
+		   SUM(CASE 
+				   WHEN product_name = "Biotin" THEN adj_revenue
+					   END) AS biotin_revenue
+	FROM revenue_adjusted_22
+	GROUP BY 1
+) AS tab;
+
+-- Calculate the gap montly difference between  Canada and UK
+SELECT 
+      date,
+      ROUND(canada_revenue - uk_revenue,2) AS canada_minus_uk_revenue,
+      ROUND(canada_revenue / uk_revenue,2) AS canada_times_uk_revenue,
+      ROUND((canada_revenue / uk_revenue -1) * 100,2) AS canada_pct_uk_revenue
+FROM (
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  SUM(CASE
+				  WHEN location = "Canada" THEN adj_revenue
+						END) AS canada_revenue,
+		  SUM(CASE
+				  WHEN location = "UK" THEN adj_revenue
+						END) AS uk_revenue
+	FROM revenue_adjusted_22
+	GROUP BY 1
+) AS tab;
+
+-- Calculate the gap montly difference between Locations Canada and uk across and platforms
+SELECT
+      date,
+      ROUND(canada_iherb_revenue - uk_iherb_revenue,2) AS canada_minus_uk_iherb_revenue,
+      ROUND(canada_iherb_revenue / uk_iherb_revenue,2) AS canada_times_uk_iherb_revenue,
+      ROUND((canada_iherb_revenue / uk_iherb_revenue -1)* 100,2) AS canada_pct_uk_iherb_revenue
+FROM(
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  SUM(CASE 
+				  WHEN location = "Canada" AND platform = "iHerb" THEN adj_revenue
+					   END) AS canada_iherb_revenue,
+		  SUM(
+			  CASE 
+				  WHEN location = "UK" AND platform = "iHerb" THEN adj_revenue
+						END ) AS uk_iherb_revenue
+	FROM revenue_adjusted_22
+	GROUP BY 1
+) AS tab;
+
 -- Calculate the percent of total sales for each category
 SELECT 
   category,
@@ -85,6 +216,24 @@ SELECT
 FROM revenue_adjusted_22
 GROUP BY category, DATE_FORMAT(date, '%Y-%m')
 ORDER BY month, category;
+
+-- Calculate the percent of total sales for each location
+SELECT 
+     DATE_FORMAT(date,"%Y-%m") AS date,
+     location,
+     ROUND(SUM(adj_revenue),2) AS monthly_revenue,
+     ROUND(SUM(adj_revenue) * 100 / SUM(SUM(adj_revenue)) OVER(PARTITION BY DATE_FORMAT(date,"%Y-%m")),2) AS pct_total
+FROM revenue_adjusted_22
+GROUP BY 1,2;
+
+-- Calculate the percent of total sales for each platform
+SELECT 
+      DATE_FORMAT(date,"%Y-%m") AS date,
+      platform,
+      ROUND(SUM(adj_revenue),2) AS monthly_revenue,
+      ROUND(SUM(adj_revenue) * 100 / SUM(SUM(adj_revenue)) OVER(PARTITION BY DATE_FORMAT(date,"%Y-%m")),2) AS pct_total
+FROM revenue_adjusted_22
+GROUP BY 1,2;
 
 -- Indexing to See Percent Change over Time Vitamins and Performance
 SELECT
@@ -101,6 +250,83 @@ FROM (
 ) AS tab
 WHERE category IN ('Performance','Vitamin')
 ORDER BY category, date;
+
+-- Indexing to See Percent Change over Time Vitamins and Protein
+SELECT
+      date,
+      category,
+      ROUND((monthly_revenue / FIRST_VALUE(monthly_revenue) OVER(PARTITION BY category ORDER BY date)-1)* 100,2) AS pct_from_index
+FROM (
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  category,
+		  SUM(adj_revenue) AS monthly_revenue
+	FROM revenue_adjusted_22
+    WHERE category IN ("Vitamin","Protein")
+	GROUP BY 1,2
+) AS tab;
+
+-- Indexing to See Percent Change over Time Vitamins and Minerals
+SELECT
+     date,
+     category,
+     ROUND((monthly_revenue / FIRST_VALUE(monthly_revenue) OVER(PARTITION BY category ORDER BY date)-1)*100,2) AS pct_from_index
+FROM(
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  category,
+		  SUM(adj_revenue) AS monthly_revenue
+	FROM revenue_adjusted_22
+    WHERE category IN ("Vitamin","Mineral")
+	GROUP BY 1,2
+) AS tab;
+
+-- Indexing to See Percent Change over Time Locations Canada and UK
+SELECT
+      date,
+      location,
+      ROUND((monthly_revenue / FIRST_VALUE(monthly_revenue) OVER(PARTITION BY location ORDER BY date)-1)* 100,2) AS pct_from_index
+FROM(
+	SELECT 
+		 DATE_FORMAT(date,"%Y-%m") AS date,
+		 location,
+		 SUM(adj_revenue) AS monthly_revenue
+	FROM revenue_adjusted_22
+    WHERE location IN ("Canada","UK")
+	GROUP BY 1,2
+) AS tab;
+
+-- Indexing to See Percent Change over Time Platforms Amazon and iHerb
+SELECT
+       date,
+       platform,
+       ROUND((monthly_revenue / FIRST_VALUE(monthly_revenue) OVER(PARTITION BY platform ORDER BY date)-1)* 100) AS pct_from_index
+FROM(
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  platform,
+		  SUM(adj_revenue) AS monthly_revenue
+	FROM revenue_adjusted_22
+    WHERE platform IN ("Amazon","iHerb")
+	GROUP BY 1,2
+) AS tab;
+
+-- Indexing to See Percent Change over Time Platforms Amazon and iHerb across Canada
+SELECT 
+      date,
+      location,
+      platform,
+      ROUND((monthly_revenue / FIRST_VALUE(monthly_revenue) OVER(PARTITION BY platform ORDER BY date)-1)*100,2) AS pct_from_index
+FROM (
+	SELECT 
+		  DATE_FORMAT(date,"%Y-%m") AS date,
+		  platform,
+		  location,
+		  SUM(adj_revenue) AS monthly_revenue
+	FROM revenue_adjusted_22
+	WHERE location = "Canada" AND platform IN ("Amazon","iHerb")
+	GROUP BY 1,2,3
+) AS tab;
 
 -- Rolling Time Windows MA for Vitamins 
 WITH monthly_revenue AS (
@@ -131,8 +357,22 @@ FROM revenue_adjusted_22
 WHERE category = 'Vitamin'
 ORDER BY date;
 
---  Period-over-Period Comparisons: YoY and MoM
-
+--  Period-over-Period Comparisons: MoM
+WITH monthly_revenue AS (
+  SELECT
+    category,
+    DATE_FORMAT(date, '%Y-%m') AS month,
+    SUM(adj_revenue) AS adj_revenue
+  FROM revenue_adjusted_22
+  GROUP BY category, month
+)
+SELECT
+  category,
+  month,
+  adj_revenue,
+  ROUND(((adj_revenue / LAG(adj_revenue) OVER (PARTITION BY category ORDER BY month) - 1) * 100), 2) AS pct_growth_from_previous
+FROM monthly_revenue
+ORDER BY category, month;
 
 
 
