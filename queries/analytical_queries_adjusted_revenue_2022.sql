@@ -1,6 +1,7 @@
 -- Create Views --------------
 USE suplements_data;
-
+SELECT *
+FROM suplements_data.data;
 -- Revenue Adjusted for 2022
 CREATE VIEW revenue_adjusted_22 AS 
 	SELECT 
@@ -329,10 +330,10 @@ FROM (
 ) AS tab;
 
 -- Rolling Time Windows MA for Vitamins 
-WITH monthly_revenue AS (
+WITH monthly_revenue_vitamins AS (
   SELECT 
     DATE_FORMAT(date, "%Y-%m") AS month,
-    ROUND(SUM(adj_revenue),2) AS total_revenue
+    ROUND(SUM(adj_revenue),2) AS total_revenue_vitamins
   FROM revenue_adjusted_22 
   WHERE category = 'Vitamin'
   GROUP BY DATE_FORMAT(date, "%Y-%m")
@@ -342,20 +343,258 @@ SELECT
   total_revenue,
   ROUND(AVG(total_revenue) OVER (ORDER BY month ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 2) AS MA_7,
   ROUND(AVG(total_revenue) OVER (ORDER BY month ROWS BETWEEN 10 PRECEDING AND CURRENT ROW), 2) AS MA_11
-FROM monthly_revenue;
+FROM monthly_revenue_vitamins;
+
+-- Rolling Time Windows MA for Minerals
+WITH montly_revenue_minerals AS(
+      SELECT 
+	        DATE_FORMAT(date,"%Y-%m") AS month,
+            ROUND(SUM(adj_revenue)) AS total_revenue_mineral
+      FROM revenue_adjusted_22
+      WHERE category = "Mineral"
+      GROUP BY 1
+)
+SELECT 
+        month,
+        total_revenue_mineral,
+        ROUND(AVG(total_revenue_mineral) OVER(ORDER BY month ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),2) AS MA_11,
+        ROUND(AVG(total_revenue_mineral) OVER(ORDER BY month ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),2) AS MA_7
+FROM montly_revenue_minerals;
+
+-- Rolling Time Windows MA for Protein
+WITH weekly_revenue_protein AS (
+    SELECT 
+          DATE_FORMAT(date,"%m-%d") AS weeks,
+          ROUND(SUM(adj_revenue)) AS total_revenue_protein
+    FROM revenue_adjusted_22
+    WHERE category = "Protein"
+    GROUP BY 1
+)
+SELECT 
+      weeks,
+      total_revenue_protein,
+      ROUND(AVG(total_revenue_protein) OVER(ORDER BY weeks ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),2) AS MA_11,
+      ROUND(AVG(total_revenue_protein) OVER(ORDER BY weeks ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),2) AS MA_7
+FROM weekly_revenue_protein;
+
+-- Rolling Time Windows MA for Performance
+WITH weekly_revenue_performance AS (
+	 SELECT 
+           DATE_FORMAT(date,"%m-%d") AS weeks,
+           SUM(adj_revenue) AS total_revenue_performance
+     FROM revenue_adjusted_22
+     WHERE category = "Performance"
+     GROUP BY 1
+)
+SELECT 
+      weeks,
+      total_revenue_performance,
+      ROUND(AVG(total_revenue_performance) OVER(ORDER BY weeks ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),2) AS MA_11,
+      ROUND(AVG(total_revenue_performance) OVER(ORDER BY weeks ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),2) AS MA_7
+FROM weekly_revenue_performance;
+
+-- Rolling Time Windows MA for Minerals in Canada
+WITH weekly_revenue_canada AS(
+     SELECT 
+           DATE_FORMAT(date,"%m-%d") AS weeks,
+           ROUND(SUM(adj_revenue),2) AS total_revenue_canada
+	FROM revenue_adjusted_22
+    WHERE location = "Canada"
+    GROUP BY 1
+)
+SELECT
+      weeks,
+      total_revenue_canada,
+      ROUND(AVG(total_revenue_canada) OVER(ORDER BY weeks ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),2) AS MA_11,
+      ROUND(AVG(total_revenue_canada) OVER(ORDER BY weeks ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),2) AS MA_7
+FROM weekly_revenue_canada;
+
+-- Rolling Time Windows MA for Proteins in UK across Amazon
+WITH weekly_revenue_proteins_uk_amazon AS (
+	 SELECT 
+           DATE_FORMAT(date,"%m-%d") AS weeks,
+           ROUND(SUM(adj_revenue),2) AS total_revenue_proteins_uk_amazon
+	 FROM revenue_adjusted_22
+     WHERE 
+          category = "Protein" AND 
+          platform = "Amazon" AND 
+          location = "UK"
+     GROUP BY 1
+)
+SELECT 
+      weeks,
+      total_revenue_proteins_uk_amazon,
+      ROUND(AVG(total_revenue_proteins_uk_amazon) OVER(ORDER BY weeks ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),2) AS MA_11,
+      ROUND(AVG(total_revenue_proteins_uk_amazon) OVER(ORDER BY weeks ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),2) AS MA_7
+FROM weekly_revenue_proteins_uk_amazon;
+
+-- Rolling Time Windows MA for Performance in iHerb across US
+WITH weekly_revemue_performance_iherb_us AS (
+     SELECT 
+           DATE_FORMAT(date,"%m-%d") AS weeks,
+           ROUND(SUM(adj_revenue),2) AS total_revenue_performance_iherb_us
+	 FROM revenue_adjusted_22
+     WHERE 
+		  category = "Performance" AND
+          platform = "iHerb" AND
+          location = "UK"
+	 GROUP BY 1
+)
+SELECT 
+      weeks,
+      total_revenue_performance_iherb_us,
+      ROUND(AVG(total_revenue_performance_iherb_us) OVER(ORDER BY weeks ROWS BETWEEN 11 PRECEDING AND CURRENT ROW),2) AS MA_11,
+      ROUND(AVG(total_revenue_performance_iherb_us) OVER(ORDER BY weeks ROWS BETWEEN 7 PRECEDING AND CURRENT ROW),2) AS MA_7
+FROM weekly_revemue_performance_iherb_us;
 
 -- Calculating Cumulative Values for Vitamins
+WITH weekly_revenue_vitamins AS (
+  SELECT 
+    date,
+    ROUND(SUM(adj_revenue),2) AS weekly_total_vitamin
+  FROM revenue_adjusted_22
+  WHERE category = 'Vitamin'
+  GROUP BY 1
+)
 SELECT 
-  DATE_FORMAT(date, '%Y-%m-%d') AS date,
-  ROUND(SUM(adj_revenue) OVER (
-    PARTITION BY DATE_FORMAT(date, '%Y-%m') 
-       ORDER BY date),2) AS revenue_mtd,
-  ROUND(SUM(adj_revenue) OVER (
-    PARTITION BY QUARTER(date), YEAR(date) 
-       ORDER BY date),2) AS revenue_qtd
-FROM revenue_adjusted_22
-WHERE category = 'Vitamin'
+  date,
+  weekly_total,
+  ROUND(SUM(weekly_total) OVER (PARTITION BY YEAR(date), MONTH(date)ORDER BY date),2) AS revenue_mtd,
+  ROUND(SUM(weekly_total) OVER (PARTITION BY YEAR(date), QUARTER(date)ORDER BY date), 2) AS revenue_qtd
+FROM weekly_revenue_vitamins
 ORDER BY date;
+
+-- Calculating Cumulative Values for Minerals
+WITH weekly_revenue_minerals AS (
+     SELECT 
+           date,
+           ROUND(SUM(adj_revenue),2) AS weekly_total_revenue_minerals
+	 FROM revenue_adjusted_22
+     WHERE category = "Mineral"
+     GROUP BY 1
+)
+SELECT 
+      date,
+      weekly_total_revenue_minerals,
+      ROUND(SUM(weekly_total_revenue_minerals) OVER(PARTITION BY YEAR(date), MONTH(date) ORDER BY date),2) AS revenue_minerals_mtd,
+      ROUND(SUM(weekly_total_revenue_minerals) OVER(PARTITION BY YEAR(date), QUARTER(date) ORDER BY date),2) AS revenue_minerals_qtd
+FROM weekly_revenue_minerals;
+
+-- Calculating Cumulative Values for Performance
+WITH weekly_total_revenue_performance AS (
+	 SELECT 
+		   date,
+           ROUND(SUM(adj_revenue),2) AS total_revenue_performance
+	 FROM revenue_adjusted_22
+     WHERE category = "Performance"
+     GROUP BY 1
+)
+SELECT 
+      date,
+      total_revenue_performance,
+      ROUND(SUM(total_revenue_performance) OVER(PARTITION BY YEAR(date), MONTH(date) ORDER BY date),2) AS revenue_performance_mtd,
+      ROUND(SUM(total_revenue_performance) OVER(PARTITION BY YEAR(date), MONTH(date) ORDER BY date),2) AS revenue_performance_qtd
+FROM weekly_total_revenue_performance;
+
+-- Calculating Cumulative Values for Proteins
+WITH weekly_total_revenue_proteins AS (
+     SELECT 
+           date,
+           ROUND(SUM(adj_revenue),2) AS total_revenue_proteins
+	  FROM revenue_adjusted_22
+      WHERE category = "Protein"
+      GROUP BY 1
+)
+SELECT 
+      date,
+      total_revenue_proteins,
+      ROUND(SUM(total_revenue_proteins) OVER(PARTITION BY YEAR(date),MONTH(date) ORDER BY date),2) AS revenue_performance_mtd,
+      ROUND(SUM(total_revenue_proteins) OVER(PARTITION BY YEAR(date), QUARTER(date) ORDER BY date),2) AS revenue_performance_qtd
+FROM weekly_total_revenue_proteins;
+
+-- Calculating Cumulative Values for Minerals in UK and across platforms
+WITH weekly_revenue_minerals_uk AS (
+     SELECT 
+           date,
+           ROUND(SUM(CASE
+				   WHEN platform = "Walmart" 
+                        AND adj_revenue IS NOT NULL THEN adj_revenue 
+                        ELSE 0
+                        END),2) AS revenue_walmart_uk,
+		   ROUND(SUM(CASE 
+					WHEN platform = "iHerb" 
+                         AND adj_revenue IS NOT NULL THEN adj_revenue
+						 ELSE 0
+                         END),2) AS revenue_iherb_uk,
+		   ROUND(SUM(CASE
+                    WHEN platform = "Amazon" 
+                         AND adj_revenue IS NOT NULL THEN adj_revenue
+                         ELSE 0
+                         END),2) AS revenue_amazon_uk,
+           ROUND(SUM(adj_revenue),2) AS total_revenue_minerals_uk
+	  FROM revenue_adjusted_22
+      WHERE location = "UK"
+      GROUP BY 1
+)
+SELECT 
+      date,
+      total_revenue_minerals_uk,
+      ROUND(SUM(revenue_walmart_uk) OVER(PARTITION BY YEAR(date), MONTH(date) ORDER BY date),2) AS walmart_revenue_mtd,
+      ROUND(SUM(revenue_walmart_uk) OVER(PARTITION BY YEAR(date), QUARTER(date) ORDER BY date),2) AS walmart_revenue_qtd,
+      ROUND(SUM(revenue_amazon_uk) OVER(PARTITION BY YEAR(date), MONTH(date) ORDER BY date),2) AS amazon_revenue_mtd,
+      ROUND(SUM(revenue_amazon_uk) OVER (PARTITION BY YEAR(date), QUARTER(date) ORDER BY date),2) AS amazon_revenue_qtd,
+      ROUND(SUM(revenue_iherb_uk) OVER(PARTITION BY YEAR(date), MONTH(date) ORDER BY date),2) AS iherb_revenue_mtd,
+      ROUND(SUM(revenue_iherb_uk) OVER(PARTITION BY YEAR(date), QUARTER(date) ORDER BY date),2) AS iherb_revenue_qtd
+FROM weekly_revenue_minerals_uk;
+
+-- Calculating Cumulative Values for Performance in Canada and across platforms
+
+CREATE VIEW canada_performace AS(
+		SELECT 
+              date,
+              adj_revenue,
+              platform
+        FROM revenue_adjusted_22
+        WHERE location = "Canada" AND category = "Performance"
+);
+
+WITH week_rev_location_platforms AS (
+
+	SELECT 
+         date,
+         "iherb" AS platform,
+         ROUND(SUM(adj_revenue),2) AS weekly_revenue
+	FROM canada_performace
+    WHERE platform = "iherb"
+    GROUP BY date
+    
+    UNION ALL
+    
+    SELECT 
+          date,
+          "Amazon" AS platform,
+          ROUND(SUM(adj_revenue),2) AS weekly_revenue
+	FROM canada_performace
+    WHERE platform = "Amazon"
+    GROUP BY 1
+    
+    UNION ALL 
+    
+    SELECT 
+         date,
+         "Walmart" AS platform,
+         ROUND(SUM(adj_revenue),2) AS weekly_revenue
+	FROM canada_performace
+    WHERE  platform = "Walmart"
+    GROUP BY 1
+    
+)
+SELECT 
+      date,
+      platform,
+      ROUND(SUM(weekly_revenue) OVER(PARTITION BY platform,YEAR(date), MONTH(date) ORDER BY date),2) AS revenue_mtd,
+      ROUND(SUM(weekly_revenue) OVER(PARTITION BY platform,YEAR(date), QUARTER(date) ORDER BY date),2) AS revenue_qtd
+FROM week_rev_location_platforms;
 
 --  Period-over-Period Comparisons: MoM
 WITH monthly_revenue AS (
@@ -374,6 +613,126 @@ SELECT
 FROM monthly_revenue
 ORDER BY category, month;
 
+--  Period-over-Period Comparisons: MoM for Vitamins
+WITH revenue_vitamins_mom AS (
+     SELECT 
+           DATE_FORMAT(date,"%Y-%m") AS months,
+           ROUND(SUM(adj_revenue),2) AS revenue,
+           "Vitamins" AS category
+	  FROM revenue_adjusted_22
+      WHERE category = "Vitamin"
+      GROUP BY 1
+)
+SELECT 
+     months,
+     revenue,
+     category,
+     ROUND(((revenue / LAG(revenue) OVER(PARTITION BY category  ORDER BY months)-1) * 100),2) AS pct_growth_from_previous
+FROM revenue_vitamins_mom;
+     
+--  Period-over-Period Comparisons: MoM for Performance
+WITH revenue_performance_mom AS (
+     SELECT 
+           DATE_FORMAT(date,"%Y-%m") AS months,
+           ROUND(SUM(adj_revenue),2) AS revenue,
+           "Performance" AS category
+	FROM revenue_adjusted_22
+    WHERE category = "Performance"
+    GROUP BY 1
+)
+SELECT 
+      months,
+      category,
+      revenue,
+      ROUND((revenue / LAG(revenue) OVER(PARTITION BY category ORDER BY months)-1 )* 100 ,2) AS pct_growth_from_previous
+FROM revenue_performance_mom;
 
+--  Period-over-Period Comparisons: MoM for Minerals
+WITH revenue_minerals_mom AS (
+     SELECT 
+           DATE_FORMAT(date,"%Y-%m") AS months,
+           "Minerals" AS category,
+           ROUND(SUM(adj_revenue),2) AS revenue
+	 FROM revenue_adjusted_22
+     WHERE category = "Mineral"
+     GROUP BY 1
+)
+SELECT 
+       months,
+       category,
+       revenue,
+       ROUND(
+       ((revenue / LAG(revenue) OVER(PARTITION BY category ORDER BY months))-1 ) * 100,2) AS pct_growth_from_previous
+FROM revenue_minerals_mom;
 
+--  Period-over-Period Comparisons: MoM for Vitamins in UK across Amazon and iHerb
+WITH revenue_vitamin_uk_amazon_iherb AS (
+     SELECT
+          DATE_FORMAT(date,"%Y-%m") AS months,
+          platform,
+          "Vitamins" AS category,
+          ROUND(SUM(adj_revenue),2) AS revenue
+	 FROM revenue_adjusted_22
+     WHERE 
+          location = "UK" AND
+          platform IN ("Amazon","iHerb") AND 
+          category = "Vitamin"
+	GROUP BY 1,2
+)
+SELECT 
+      months,
+      category,
+      platform,
+      revenue,
+      ROUND(
+      ((revenue / LAG(revenue) OVER(PARTITION BY platform ORDER BY months))-1)* 100,2) AS pct_growth_from_previous
+FROM revenue_vitamin_uk_amazon_iherb;
 
+--  Period-over-Period Comparisons: MoM for Minerals in Canada and Uk across Amazon
+WITH revenue_minerals_cad_uk_amazon AS (
+      SELECT 
+            DATE_FORMAT(date,"%Y-%m") AS months,
+            location,
+            "Amazon" AS platform,
+            "Minerals" AS minerals,
+            ROUND(SUM(adj_revenue),2) AS revenue
+	   FROM revenue_adjusted_22
+       WHERE 
+            location IN ("Canada", "UK") AND
+            platform = "Amazon"
+	   GROUP BY months,location
+)
+SELECT 
+      months,
+      location,
+      platform,
+      minerals,
+      revenue,
+      ROUND(
+      ((revenue / LAG(revenue) OVER(PARTITION BY location ORDER BY months))-1) * 100,2) AS pct_growth_from_previous
+FROM revenue_minerals_cad_uk_amazon;
+
+--  Period-over-Period Comparisons: MoM for Performance in Canada and US acoross Amazon and iHerb
+WITH performance_cad_us_amazon_iherb AS (
+    SELECT 
+          DATE_FORMAT(date,"%Y-%m") AS months,
+          location,
+          platform,
+          "Performance" AS category,
+          ROUND(SUM(adj_revenue),2) AS revenue
+	FROM revenue_adjusted_22
+    WHERE 
+         location IN("Canada","USA") AND
+         platform IN ("Amazon", "iHerb") AND
+         category = "Performance"
+	GROUP BY 1,2,3
+)
+SELECT 
+      months,
+      location,
+      platform,
+      category,
+      revenue,
+      ROUND(
+      (revenue / LAG(revenue) OVER(PARTITION BY location,platform ORDER BY months)-1) * 100,2) AS pct_growth_from_previous
+FROM performance_cad_us_amazon_iherb;
